@@ -3,23 +3,22 @@
 import { Button, Divider, Input, Tooltip } from '@nextui-org/react';
 import * as React from 'react';
 import { Eye, EyeClosed } from '@phosphor-icons/react';
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 import { useMutation } from '@tanstack/react-query';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import Link from 'next/link';
-import { signIn } from 'next-auth/react';
 
-interface LoginForm {
+interface RegisterForm {
+  name: string;
   email: string;
   password: string;
 }
 
-const Login: React.FC = () => {
+const Register: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
 
-  const loginMutation = useMutation({
-    mutationFn: async ({ email, password }: LoginForm) =>
-      await signIn('credentials', { email, password, callbackUrl: '/' }),
+  const registerMutation = useMutation({
+    mutationFn: async (data: RegisterForm) => axios.post('/api/auth/register', data),
   });
 
   const {
@@ -27,35 +26,46 @@ const Login: React.FC = () => {
     register,
     setError,
     formState: { errors },
-  } = useForm<LoginForm>({
+  } = useForm<RegisterForm>({
     mode: 'onChange',
-    disabled: loginMutation.isPending,
+    disabled: registerMutation.isPending,
   });
 
-  const handleSubmitForm: SubmitHandler<LoginForm> = async (formData, event) => {
+  const handleSubmitForm: SubmitHandler<RegisterForm> = async (formData, event) => {
     event?.preventDefault();
 
-    loginMutation.mutate(formData, {
+    registerMutation.mutate(formData, {
       onError: (error) => {
-        console.log(error);
+        const e = error as AxiosError<{ message: string }>;
 
-        setError('password', {
-          type: 'manual',
-          message: (error as AxiosError<{ error: string }>).response?.data.error,
-        });
+        if (e.response?.status === 409) {
+          setError('email', {
+            type: 'manual',
+            message: e.response?.data.message,
+          });
+        }
       },
     });
   };
 
   return (
     <section className='container flex flex-col items-center gap-2 py-8'>
-      <h2 className='text-2xl font-bold'>Đăng nhập</h2>
+      <h2 className='text-2xl font-bold'>Đăng ký</h2>
 
       <div className='flex w-full max-w-lg flex-col items-stretch gap-6'>
         <form
-          className='flex w-full flex-col items-stretch gap-2'
           onSubmit={handleSubmit(handleSubmitForm)}
+          className='flex w-full flex-col items-stretch gap-2'
         >
+          <Input
+            {...register('name')}
+            name='name'
+            label='Name'
+            placeholder='Your full name'
+            errorMessage={errors.name?.message}
+            isInvalid={!!errors.name?.message}
+          />
+
           <Input
             {...register('email')}
             type='email'
@@ -89,15 +99,15 @@ const Login: React.FC = () => {
             errorMessage={errors.password?.message}
           />
 
-          <Button type='submit' color='primary' isLoading={loginMutation.isPending}>
-            Đăng nhập
+          <Button type='submit' color='primary' isLoading={registerMutation.isPending}>
+            Đăng ký
           </Button>
         </form>
 
         <div className='text-center text-sm text-default-500'>
-          Chưa có tài khoản?{' '}
-          <Link href='/register' className='font-semibold'>
-            Đăng ký
+          Đã có tài khoản?{' '}
+          <Link href='/login' className='font-semibold'>
+            Đăng nhập
           </Link>
         </div>
 
@@ -109,4 +119,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login;
+export default Register;
